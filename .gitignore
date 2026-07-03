@@ -46,3 +46,8 @@ next-env.d.ts
 /tmp-repos/
 /cloned-repos/
 /repos-temp/
+
+# cognee data
+.cognee_system/
+cognee.db
+*.db
