@@ -21,6 +21,11 @@ export interface Commit {
    * The time the commit was made, represented as an ISO 8601 string or Unix timestamp. 
    */
   timestamp: string | number;
+
+  /**
+   * The list of files that were modified, added, or deleted in this commit.
+   */
+  files?: FileEntity[];
 }
 
 /**
