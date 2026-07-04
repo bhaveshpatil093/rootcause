@@ -4,7 +4,7 @@ import { askRootCause } from '../../../lib/recall/queryBuilder';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { question, datasetName } = body;
+    const { question, datasetNames } = body;
     if (!question || typeof question !== 'string') {
       return NextResponse.json(
         { error: 'question is required and must be a string' },
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     }
 
     const result = await askRootCause(question, {
-      datasetNames: datasetName ? [datasetName] : undefined,
+      datasetNames: Array.isArray(datasetNames) && datasetNames.length > 0 ? datasetNames : undefined,
     });
     const answer =
       result?.result?.kind === 'Text'

@@ -12,11 +12,7 @@ import { logger } from '../../../lib/ingestion/logger';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    let { githubUrl, maxCommits = 3, fastMode = false } = body;
-    
-    // STRICT CAP: Free tier LLMs (like NVIDIA Nim) have severe rate limits. 
-    // Cognee parallelizes graph extraction, so anything > 3 will likely trigger HTTP 429s.
-    maxCommits = Math.min(maxCommits, 3);
+    let { githubUrl, maxCommits = 30, fastMode = false } = body;
 
     if (!githubUrl || typeof githubUrl !== 'string') {
       return NextResponse.json(
@@ -54,24 +50,28 @@ export async function POST(request: Request) {
       }
     }
 
-    // Push all successfully parsed commits to Cognee in a single batch call.
+    // Push all successfully parsed commits to Cognee in batches of 10.
     // Batching is required — Cognee's cognify pipeline short-circuits on
-    // repeat remember() calls to an already-completed dataset, so calling
-    // it once per commit would silently skip graph extraction for all but
-    // the first commit.
-    let processedCount = 0;
-    const datasetName = `commits-${repoHash}-${Date.now()}`;
-    if (entities.length > 0) {
-      await pushCommitsToCognee(entities, datasetName);
-      processedCount = entities.length;
+    // repeat remember() calls to an already-completed dataset.
+    // We create unique dataset names per batch to avoid this short-circuit.
+    const datasetNames: string[] = [];
+    const BATCH_SIZE = 10;
+    
+    for (let i = 0; i < entities.length; i += BATCH_SIZE) {
+      const batch = entities.slice(i, i + BATCH_SIZE);
+      const datasetName = `commits-${repoHash}-${Date.now()}-batch-${i / BATCH_SIZE}`;
+      logger.info(`Pushing batch ${i / BATCH_SIZE + 1} (${batch.length} commits) to Cognee dataset: ${datasetName}...`);
+      await pushCommitsToCognee(batch, datasetName);
+      datasetNames.push(datasetName);
+      logger.info(`Batch ${i / BATCH_SIZE + 1} pushed successfully.`);
     }
 
     return NextResponse.json({
       message: 'Ingestion complete',
-      processedCommits: processedCount,
+      processedCommits: entities.length,
       errors: errors.length > 0 ? errors : undefined,
       repo: githubUrl,
-      datasetName: datasetName
+      datasetNames: datasetNames
     });
 
   } catch (error: any) {

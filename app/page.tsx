@@ -56,7 +56,7 @@ export default function Home() {
   const [repoUrl, setRepoUrl] = useState('');
   const [ingesting, setIngesting] = useState(false);
   const [ingestStatus, setIngestStatus] = useState<string | null>(null);
-  const [activeDataset, setActiveDataset] = useState<string | null>(null);
+  const [activeDatasets, setActiveDatasets] = useState<string[]>([]);
 
   async function handleIngest(e: React.FormEvent) {
     e.preventDefault();
@@ -75,7 +75,7 @@ export default function Home() {
 
       if (res.ok) {
         setIngestStatus(`Case opened — ${data.processedCommits} commits added to the graph.`);
-        setActiveDataset(data.datasetName);
+        setActiveDatasets(data.datasetNames || []);
       } else {
         setIngestStatus(`Error: ${data.error || 'ingestion failed'}`);
       }
@@ -100,7 +100,7 @@ export default function Home() {
       const res = await fetch('/api/recall', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: askedQuestion, datasetName: activeDataset }),
+        body: JSON.stringify({ question: askedQuestion, datasetNames: activeDatasets }),
       });
       const data = await res.json();
       const answer = data.answer || data.error || 'No answer returned.';
