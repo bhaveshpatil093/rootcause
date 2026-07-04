@@ -1,4 +1,5 @@
-import { Cognee } from '@cognee/cognee-ts';
+import 'dotenv/config';
+import { cognee } from './cogneeClient';
 import { logger } from './logger';
 
 /**
@@ -11,13 +12,12 @@ import { logger } from './logger';
  */
 export async function findRelatedBugs(fileName: string, functionName?: string) {
   try {
-    const cognee = new Cognee();
     
     // Construct a natural language query that relies on the graph having formed 
     // edges between (Commit)-[FIXES]->(Bug) and (Commit)-[TOUCHES]->(File/Function)
-    let query = `what bugs were fixed in the file ${fileName}?`;
+    let query = `what is the current status of the bug fixed in ${fileName}? Was the fix reverted or invalidated?`;
     if (functionName) {
-      query = `what bugs were fixed that touched the function ${functionName} in the file ${fileName}?`;
+      query = `what is the current status of the bug fixed in ${functionName} in ${fileName}? Was it reverted?`;
     }
 
     logger.info(`[Diagnostic] Querying Cognee for related bugs...`);
@@ -36,7 +36,7 @@ export async function findRelatedBugs(fileName: string, functionName?: string) {
 }
 
 // Simple execution wrapper so this file can be run directly via `npx tsx`
-if (import.meta.url === \`file://\${process.argv[1]}\`) {
+if (import.meta.url === `file://${process.argv[1]}`) {
   const fileArg = process.argv[2] || 'cache.ts';
   const funcArg = process.argv[3]; // optional
   
