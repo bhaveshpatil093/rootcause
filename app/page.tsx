@@ -31,20 +31,6 @@ interface CaseEntry {
   relatedCommits: string[];
 }
 
-function getVerdict(answer: string): Verdict {
-  const resurfaced = /resurfac|happened before|reintroduc|regress|did not hold|didn.?t hold/i.test(answer);
-  const noPriorRecord = /no indication|has not occurred before|not occurred before|not been mentioned|has not happened before/i.test(answer);
-
-  if (resurfaced && !noPriorRecord) return 'RESURFACED';
-  if (noPriorRecord) return 'RESOLVED';
-  return 'UNKNOWN';
-}
-
-function extractCommits(answer: string): string[] {
-  const matches = answer.match(/commit\s+([a-z0-9]{6,8})/gi) || [];
-  const hashes = matches.map((m) => m.replace(/commit\s+/i, ''));
-  return Array.from(new Set(hashes));
-}
 
 const VERDICT_STYLES: Record<Verdict, { label: string; color: string; border: string; bg: string }> = {
   RESOLVED: {
@@ -166,8 +152,8 @@ export default function Home() {
         id: Date.now(),
         question: askedQuestion,
         answer,
-        verdict: getVerdict(answer),
-        relatedCommits: extractCommits(answer),
+        verdict: data.verdict || 'UNKNOWN',
+        relatedCommits: data.relatedCommits || [],
       };
 
       setCases((prev) => [entry, ...prev]);
