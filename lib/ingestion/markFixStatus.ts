@@ -22,7 +22,7 @@ Reason: ${reason}
   try {
     const entry = { type: 'text' as const, text: statusUpdateText };
     await withRetry(() => cognee.remember([entry], 'commits'));
-    console.log(`[INFO] [FixStatus] Successfully pushed revert status for ${commitHash} to Cognee.`);
+    logger.info(`[FixStatus] Successfully pushed revert status for ${commitHash} to Cognee.`);
   } catch (error: any) {
     logger.error(`[FixStatus] Failed to push revert status for ${commitHash}:`, error);
     throw error;

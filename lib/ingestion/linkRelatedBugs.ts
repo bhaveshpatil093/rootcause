@@ -20,13 +20,8 @@ export async function findRelatedBugs(fileName: string, functionName?: string) {
       query = `what is the current status of the bug fixed in ${functionName} in ${fileName}? Was it reverted?`;
     }
 
-    logger.info(`[Diagnostic] Querying Cognee for related bugs...`);
-    logger.info(`[Diagnostic] Query: "${query}"`);
-
     // Ask Cognee to recall information based on the semantic query
     const answer = await cognee.recall(query);
-    
-    logger.info(`[Diagnostic] Recall Results:`, answer);
     
     return answer;
   } catch (error: any) {

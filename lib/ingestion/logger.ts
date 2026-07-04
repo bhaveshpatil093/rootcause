@@ -5,23 +5,23 @@
 export const logger = {
   info: (message: string, meta?: any) => {
     if (meta !== undefined) {
-      console.log(`[INFO] ${message}`, meta);
+      console.log(`\x1b[36m[RootCause]\x1b[0m ℹ️  ${message}`, meta);
     } else {
-      console.log(`[INFO] ${message}`);
+      console.log(`\x1b[36m[RootCause]\x1b[0m ℹ️  ${message}`);
     }
   },
   warn: (message: string, meta?: any) => {
     if (meta !== undefined) {
-      console.warn(`[WARN] ${message}`, meta);
+      console.warn(`\x1b[33m[RootCause]\x1b[0m ⚠️  ${message}`, meta);
     } else {
-      console.warn(`[WARN] ${message}`);
+      console.warn(`\x1b[33m[RootCause]\x1b[0m ⚠️  ${message}`);
     }
   },
   error: (message: string, meta?: any) => {
     if (meta !== undefined) {
-      console.error(`[ERROR] ${message}`, meta);
+      console.error(`\x1b[31m[RootCause]\x1b[0m ❌ ${message}`, meta);
     } else {
-      console.error(`[ERROR] ${message}`);
+      console.error(`\x1b[31m[RootCause]\x1b[0m ❌ ${message}`);
     }
   }
 };

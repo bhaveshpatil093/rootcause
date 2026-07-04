@@ -1,4 +1,5 @@
 import { Cognee } from '@cognee/cognee-ts';
+import { logger } from './logger';
 
 export const cognee = new Cognee({
   llmProvider: process.env.COGNEE_LLM_PROVIDER || "openai",
@@ -23,7 +24,7 @@ export async function withRetry<T>(fn: () => Promise<T>, maxRetries = 3): Promis
         throw error;
       }
       const backoffMs = Math.pow(2, attempt) * 1000;
-      console.warn(`[Cognee Retry] Attempt ${attempt} failed (${error.message}). Retrying in ${backoffMs}ms...`);
+      logger.warn(`[Cognee Retry] Attempt ${attempt} failed (${error.message}). Retrying in ${backoffMs}ms...`);
       await new Promise((res) => setTimeout(res, backoffMs));
     }
   }

@@ -46,7 +46,7 @@ async function runIngestionJob(jobId: string, githubUrl: string, maxCommits: num
         logger.warn(`Error processing commit ${rawCommit.hash}:`, err);
         errors.push(`Commit ${rawCommit.hash}: ${err.message}`);
       }
-      updateJob(jobId, { progress: i + 1, message: `Extracted entities (${i + 1}/${commitsToProcess.length})` });
+      updateJob(jobId, { progress: i + 1, message: `Extracting AST and bug entities...` });
     }
 
     const stats = calculateStats(entities, errors);

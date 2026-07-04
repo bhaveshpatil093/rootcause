@@ -51,7 +51,7 @@ async function seedSyntheticRepo() {
 async function runDemo() {
   const { repoPath, fixHash } = await seedSyntheticRepo();
 
-  console.log("\n--- Starting Ingestion via API ---");
+  logger.info("\n--- Starting Ingestion via API ---");
   const ingestRes = await fetch('http://localhost:3000/api/ingest', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -64,27 +64,27 @@ async function runDemo() {
   
   const ingestData = await ingestRes.json();
   const jobId = ingestData.jobId;
-  console.log("Job ID:", jobId);
+  logger.info(`Job ID: ${jobId}`);
 
   let datasetNames: string[] = [];
   
   while (true) {
     const statusRes = await fetch(`http://localhost:3000/api/ingest/status/${jobId}`);
     const statusData = await statusRes.json();
-    console.log(`Status: ${statusData.status} - ${statusData.message}`);
+    logger.info(`Status: ${statusData.status} - ${statusData.message}`);
     
     if (statusData.status === 'completed') {
       datasetNames = statusData.datasetNames || [];
-      console.log("Ingestion Stats:", statusData.stats);
+      logger.info("Ingestion Stats:", statusData.stats);
       break;
     } else if (statusData.status === 'failed') {
-      console.error("Ingestion failed:", statusData.error);
+      logger.error("Ingestion failed:", statusData.error);
       return;
     }
     await new Promise(r => setTimeout(r, 2000));
   }
 
-  console.log("\n--- Simulating Revert/Resurface via API marking ---");
+  logger.info("\n--- Simulating Revert/Resurface via API marking ---");
   // The system usually detects this through LLM recall matching, but for deterministic demoing
   // we use our explicit utility just like before.
   await fetch('http://localhost:3000/api/mock-revert', {
@@ -93,9 +93,9 @@ async function runDemo() {
     body: JSON.stringify({ commitHash: fixHash, reason: "Regression caused by speed optimization refactor" })
   });
 
-  console.log("\n--- Querying Recall API ---");
+  logger.info("\n--- Querying Recall API ---");
   const question = "Why did the calculator divide by zero crash happen, and has it been fixed?";
-  console.log(`Q: ${question}`);
+  logger.info(`Q: ${question}`);
   
   const recallRes = await fetch('http://localhost:3000/api/recall', {
     method: 'POST',
@@ -107,7 +107,7 @@ async function runDemo() {
   });
 
   const recallData = await recallRes.json();
-  console.log(`\nA: ${recallData.answer}`);
+  logger.info(`\nA: ${recallData.answer}`);
 }
 
-runDemo().catch(console.error);
+runDemo().catch(err => logger.error("Demo run failed:", err));
