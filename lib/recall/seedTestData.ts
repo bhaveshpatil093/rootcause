@@ -1,4 +1,5 @@
-import { cognee } from '../ingestion/cogneeClient';
+import * as dotenv from 'dotenv';
+dotenv.config({ path: '.env.local' });
 
 const sampleCommits = [
   "Commit a1b2c3d by shreya on 2026-06-10: 'fix: resolve null pointer in auth token refresh' — touched files: auth.ts, tokenManager.ts. Root cause: token refresh was called before the session object was initialized, causing a race condition on cold start.",
@@ -11,10 +12,10 @@ const sampleCommits = [
 async function seed() {
   console.log(`Seeding ${sampleCommits.length} sample commits into Cognee...\n`);
 
-  for (const commit of sampleCommits) {
-    console.log(`Remembering: ${commit.substring(0, 80)}...`);
-    await cognee.remember({ type: "text", text: commit }, "commits");
-  }
+  const entries = sampleCommits.map(commit => ({ type: "text" as const, text: commit }));
+  
+  const { cognee } = await import('../ingestion/cogneeClient');
+  await cognee.remember(entries, "demo-auth-bug");
 
   console.log("\nSeeding complete.");
 }
