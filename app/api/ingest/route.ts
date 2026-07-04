@@ -10,6 +10,7 @@ import { mkdirSync } from 'fs';
 import crypto from 'crypto';
 import { logger } from '../../../lib/ingestion/logger';
 import { createJob, updateJob, jobStore } from '../../../lib/ingestion/jobStore';
+import { calculateStats } from '../../../lib/ingestion/stats';
 
 async function runIngestionJob(jobId: string, githubUrl: string, maxCommits: number, fastMode: boolean, dryRun: boolean) {
   const repoHash = crypto.createHash('md5').update(githubUrl).digest('hex');
@@ -48,12 +49,15 @@ async function runIngestionJob(jobId: string, githubUrl: string, maxCommits: num
       updateJob(jobId, { progress: i + 1, message: `Extracted entities (${i + 1}/${commitsToProcess.length})` });
     }
 
+    const stats = calculateStats(entities, errors);
+
     if (dryRun) {
       updateJob(jobId, {
         status: 'completed',
         message: 'Dry run complete (no data pushed to Cognee)',
         datasetNames: [],
         dryRunData: entities,
+        stats,
         error: errors.length > 0 ? errors.join('; ') : undefined
       });
       return;
@@ -79,6 +83,7 @@ async function runIngestionJob(jobId: string, githubUrl: string, maxCommits: num
       status: 'completed', 
       message: 'Ingestion complete', 
       datasetNames,
+      stats,
       error: errors.length > 0 ? errors.join('; ') : undefined
     });
 

@@ -97,7 +97,13 @@ export default function Home() {
         if (job.status === 'completed') {
           clearInterval(interval);
           setIngesting(false);
-          setIngestStatus(`Case opened — ${job.total} commits added to the graph.`);
+          
+          if (job.stats) {
+            setIngestStatus(`Case opened! ${job.stats.totalCommits} commits, ${job.stats.fixCommitsDetected} fixes, ${job.stats.functionsMapped} functions mapped.`);
+          } else {
+            setIngestStatus(`Case opened — ${job.total} commits added to the graph.`);
+          }
+          
           setIngestProgress(null);
           setActiveDatasets(job.datasetNames || []);
         } else if (job.status === 'failed') {

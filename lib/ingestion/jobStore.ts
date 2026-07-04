@@ -1,3 +1,5 @@
+import { IngestionStats } from './stats';
+
 export type JobStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
 export interface IngestionJob {
@@ -10,6 +12,7 @@ export interface IngestionJob {
   repoUrl: string;
   error?: string;
   dryRunData?: any;
+  stats?: IngestionStats;
 }
 
 // In-memory global store to survive API route instantiations (though it may wipe on dev hot-reload)
