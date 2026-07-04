@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error('Recall failed:', error);
     return NextResponse.json(
-      { error: 'Recall failed', details: error.message },
+      { error: 'Recall failed. Please try again.' },
       { status: 500 }
     );
   }
