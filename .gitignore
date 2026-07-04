@@ -51,3 +51,7 @@ next-env.d.ts
 .cognee_system/
 cognee.db
 *.db
+# Cognee runtime files
+target/
+.data_storage/
+.anon_id

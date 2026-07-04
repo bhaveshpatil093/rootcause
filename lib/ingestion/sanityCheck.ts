@@ -1,6 +1,4 @@
-import { Cognee } from '@cognee/cognee-ts';
-
-const cognee = new Cognee();
+import { cognee } from './cogneeClient';
 
 async function main() {
   console.log("--- Cognee SDK Sanity Check ---");
