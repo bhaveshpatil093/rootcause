@@ -1,59 +1,62 @@
-# RootCause
+# RootCause 🔍
 
-RootCause is an AI-powered debugging assistant that acts as a corporate memory for your codebase. By analyzing your git history and automatically tracking bug fixes and regressions, RootCause helps developers understand *why* bugs happened, *when* they were fixed, and *if* they've resurfaced.
+RootCause is an AI-powered debugging assistant that acts as a corporate memory for your codebase. By analyzing your git history and automatically tracking bug fixes and regressions, RootCause helps developers understand *why* bugs happened, *when* they were fixed, and critically, *if* they've resurfaced.
 
-## How it Works: The Ingestion Pipeline
+## Documentation
 
-The backend ingestion pipeline is the heart of RootCause. When you submit a GitHub repository for analysis, the pipeline orchestrates the following architecture to build a queryable knowledge graph.
+For a detailed look at the architecture, schema, and live demo script, please read the following:
+- 📖 [Integration & Architecture Notes](docs/integration-notes.md) - The single source of truth for how the system works end-to-end, detailing the async job flow, graph schema, and verdict logic.
+- 🎤 [Live Demo Script](docs/demo-script.md) - The exact script and steps to use when presenting RootCause on stage.
 
-### Architecture Flow
+## How it Works: The End-to-End Pipeline
 
-1. **Next.js API Route (`/api/ingest`)**
-   - Receives the repository URL and kicks off an asynchronous background job.
-   - Returns a Job ID to the frontend, allowing the client to poll `/api/ingest/status/[jobId]` for real-time progress updates.
-   
-2. **Git Parsing (`lib/ingestion/parseHistory.ts`)**
-   - Shallow clones the target repository using `simple-git`.
-   - Extracts the commit log and parses the raw string diffs of each commit to understand what code was touched.
-   
-3. **Entity Extraction (`lib/ingestion/extractEntities.ts`)**
-   - Parses the diff to map which functions were modified.
-   - Uses an LLM (`detectFixes`) to analyze the commit message and diff. It determines if the commit was a FIX, and if so, extracts the specific `Bug` entity that was resolved.
-   
-4. **Knowledge Graph Insertion (`lib/ingestion/remember.ts`)**
-   - The structured data (Commits, Bugs, Files, and Functions) is pushed into **Cognee** via the `@cognee/cognee-ts` SDK.
-   - Cognee translates these TypeScript objects into nodes and edges, permanently recording the semantic history of the codebase into a local LanceDB instance.
+The system combines an asynchronous React frontend, a Next.js API, and a local LanceDB graph powered by the `@cognee/cognee-ts` SDK.
 
-### Graph vs. Vector Search: The Secret Sauce
-
-RootCause relies heavily on **Cognee** to manage its memory. To accurately answer complex debugging queries (like "Has this bug resurfaced?"), we combine the strengths of both Vector and Graph databases:
-
-* **Vector Search (The Entry Point):** When a user asks a question in natural language (e.g., *"Why is the auth token timing out?"*), we use vector embeddings to semantically match their question to a node in the database. Vector search is excellent for fuzzy matching and understanding intent, allowing us to locate the specific `Bug` node related to auth tokens.
-* **Graph Traversal (The Truth):** Once we locate the node via Vector search, we switch to Graph traversal. Graph databases use deterministic edges, meaning we can traverse relationships with 100% accuracy and zero LLM hallucination. We traverse the `FIXED_BY` edge to find the commit that fixed it, the `TOUCHES` edge to see which functions were altered, and the `REVERTED_BY` edge to determine if the fix was later undone, perfectly answering the user's question.
+1. **Async Ingestion (`POST /api/ingest`)**
+   - The UI submits a GitHub repository URL. The backend immediately returns a `jobId` (HTTP 202) and clones the repository in the background.
+   - The UI polls `/api/ingest/status/[jobId]` every 2 seconds to render a live progress bar.
+2. **Entity Extraction (`extractEntities.ts`)**
+   - We extract `Commit`, `File`, and `Function` nodes.
+   - Using an LLM, we analyze diffs to construct semantic `Bug` and `Fix` entities. We explicitly track if a fix `held: boolean` to detect regressions.
+3. **Graph Storage (`remember.ts`)**
+   - Entities and their relationships (`RESOLVES_BUG`, `IS_RELATED_TO`) are batch-pushed into the **Cognee** knowledge graph.
+   - Data is strictly scoped using unique Dataset Names (`commits-[hash]-[timestamp]`) to prevent cross-contamination between repositories.
+4. **Structured Recall (`POST /api/recall`)**
+   - When a user asks a debugging question via the UI, RootCause queries the exact scoped dataset in LanceDB.
+   - Using a strict system prompt, the LLM analyzes the graph edges and outputs structured JSON containing an exact verdict (`RESOLVED`, `RESURFACED`, `UNKNOWN`) and cites the specific `relatedCommits`.
+   - The UI safely parses this JSON to render the Investigation Verdict badge.
 
 ## Getting Started
 
-First, install dependencies:
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+2. **Configure your environment variables:**
+   ```bash
+   cp .env.local.example .env.local
+   ```
+   Add your `NVIDIA_API_KEY` (or OpenAI equivalent) into `.env.local`.
+
+3. **Run the development server:**
+   ```bash
+   npm run dev
+   ```
+
+4. Open [http://localhost:3000](http://localhost:3000) with your browser.
+
+## Testing & Demo Setup
+
+### Preparing for the Demo
+To pre-warm the database for the live demo and bypass any rate limits or conference Wi-Fi issues, run the pre-ingestion script:
 ```bash
-npm install
+npm run demo:prepare
 ```
+*(This uses `scripts/final-demo.ts` to ingest `axios/axios` into the local LanceDB graph).*
 
-Configure your environment variables:
+### Local CLI Testing
+You can interact with the graph directly from the terminal without the web UI:
 ```bash
-cp .env.local.example .env.local
-# Add your NVIDIA Nim (or OpenAI) API keys
-```
-
-Run the development server:
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser.
-
-## Testing & Demoing
-
-To run a fast, end-to-end synthetic demo of the ingestion pipeline without relying on external repos or network limits:
-```bash
-npm run ingest:test
+npx tsx lib/recall/cli.ts
 ```
