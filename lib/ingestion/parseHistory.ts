@@ -29,16 +29,15 @@ export async function getCommitLog(repoPath: string): Promise<CommitLogEntry[]> 
 
 export type { CommitLogEntry };
 
-export interface ChangedLineRange {
-  oldStart: number;
-  oldLines: number;
-  newStart: number;
-  newLines: number;
+export interface LineRange {
+  start: number;
+  end: number;
 }
 
 export interface FileDiff {
   file: string;
-  ranges: ChangedLineRange[];
+  addedRanges: LineRange[];
+  removedRanges: LineRange[];
 }
 
 export interface DiffResult {
@@ -46,8 +45,28 @@ export interface DiffResult {
   files: FileDiff[];
 }
 
+// Helper to convert an array of line numbers into contiguous ranges
+function toRanges(lines: number[]): LineRange[] {
+  if (lines.length === 0) return [];
+  const ranges: LineRange[] = [];
+  let start = lines[0];
+  let prev = lines[0];
+  
+  for (let i = 1; i < lines.length; i++) {
+    if (lines[i] === prev + 1) {
+      prev = lines[i];
+    } else {
+      ranges.push({ start, end: prev });
+      start = lines[i];
+      prev = lines[i];
+    }
+  }
+  ranges.push({ start, end: prev });
+  return ranges;
+}
+
 /**
- * Retrieves the changed files and changed line ranges for a given commit.
+ * Retrieves the changed files and exact added/removed line ranges for a given commit.
  *
  * @param repoPath The local path to the git repository.
  * @param commitHash The hash of the commit to inspect.
@@ -61,31 +80,60 @@ export async function getCommitDiff(repoPath: string, commitHash: string): Promi
     const diffString = await git.show([commitHash, '--format=']);
     
     const files: FileDiff[] = [];
-    let currentFile: FileDiff | null = null;
+    let currentFile: { file: string, added: number[], removed: number[] } | null = null;
+    
+    let currentOldLine = 0;
+    let currentNewLine = 0;
     
     const lines = diffString.split('\n');
     
     for (const line of lines) {
       if (line.startsWith('diff --git')) {
+        // Process the previous file
+        if (currentFile) {
+          files.push({
+            file: currentFile.file,
+            addedRanges: toRanges(currentFile.added),
+            removedRanges: toRanges(currentFile.removed)
+          });
+        }
+        
         // e.g., diff --git a/path/to/file b/path/to/file
         const parts = line.split(' ');
         const bFile = parts[parts.length - 1];
         // Strip the b/ prefix to get the actual file path
         const filePath = bFile.replace(/^b\//, '');
-        currentFile = { file: filePath, ranges: [] };
-        files.push(currentFile);
+        currentFile = { file: filePath, added: [], removed: [] };
       } else if (line.startsWith('@@ ') && currentFile) {
         // e.g., @@ -14,7 +14,8 @@
         const match = line.match(/@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/);
         if (match) {
-          currentFile.ranges.push({
-            oldStart: parseInt(match[1], 10),
-            oldLines: match[2] ? parseInt(match[2], 10) : 1,
-            newStart: parseInt(match[3], 10),
-            newLines: match[4] ? parseInt(match[4], 10) : 1,
-          });
+          currentOldLine = parseInt(match[1], 10);
+          currentNewLine = parseInt(match[3], 10);
+        }
+      } else if (currentFile) {
+        if (line.startsWith('--- ') || line.startsWith('+++ ')) {
+          // File headers, ignore
+        } else if (line.startsWith('-')) {
+          currentFile.removed.push(currentOldLine);
+          currentOldLine++;
+        } else if (line.startsWith('+')) {
+          currentFile.added.push(currentNewLine);
+          currentNewLine++;
+        } else if (line.startsWith(' ')) {
+          currentOldLine++;
+          currentNewLine++;
         }
       }
+    }
+    
+    // Push the last file processed
+    if (currentFile) {
+      files.push({
+        file: currentFile.file,
+        addedRanges: toRanges(currentFile.added),
+        removedRanges: toRanges(currentFile.removed)
+      });
     }
     
     return {
