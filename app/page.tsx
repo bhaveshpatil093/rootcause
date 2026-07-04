@@ -1,3 +1,22 @@
+/*
+ * AUDIT FINDINGS (API vs Client Expectations)
+ * 
+ * 1. /api/ingest current return signature:
+ *    - Status 202 Accepted
+ *    - JSON: { message: 'Ingestion job started', jobId: 'uuid-string' }
+ *    - Data is no longer returned synchronously.
+ * 
+ * 2. app/page.tsx (handleIngest):
+ *    - ALREADY FIXED! During a previous step, handleIngest was proactively updated 
+ *      to correctly expect `{ jobId }` and a 202 status, kicking off `pollJob()`.
+ *      It correctly handles the new async polling architecture.
+ * 
+ * 3. lib/recall/cli.ts:
+ *    - MISMATCH: It does not call `/api/ingest`, but it hardcodes 
+ *      `datasetNames: ["demo-auth-bug"]`. This is broken because dataset names 
+ *      are now dynamically generated (e.g., `commits-[hash]-[timestamp]-batch-0`).
+ *      The CLI needs to be updated to either fetch datasets dynamically or accept them as arguments.
+ */
 'use client';
 
 import React, { useState } from 'react';
