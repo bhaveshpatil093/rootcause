@@ -11,7 +11,7 @@ import crypto from 'crypto';
 import { logger } from '../../../lib/ingestion/logger';
 import { createJob, updateJob, jobStore } from '../../../lib/ingestion/jobStore';
 
-async function runIngestionJob(jobId: string, githubUrl: string, maxCommits: number, fastMode: boolean) {
+async function runIngestionJob(jobId: string, githubUrl: string, maxCommits: number, fastMode: boolean, dryRun: boolean) {
   const repoHash = crypto.createHash('md5').update(githubUrl).digest('hex');
   const reposBaseDir = join(tmpdir(), 'rootcause-repos');
   const destDir = join(reposBaseDir, repoHash);
@@ -48,6 +48,17 @@ async function runIngestionJob(jobId: string, githubUrl: string, maxCommits: num
       updateJob(jobId, { progress: i + 1, message: `Extracted entities (${i + 1}/${commitsToProcess.length})` });
     }
 
+    if (dryRun) {
+      updateJob(jobId, {
+        status: 'completed',
+        message: 'Dry run complete (no data pushed to Cognee)',
+        datasetNames: [],
+        dryRunData: entities,
+        error: errors.length > 0 ? errors.join('; ') : undefined
+      });
+      return;
+    }
+
     const datasetNames: string[] = [];
     const BATCH_SIZE = 10;
     
@@ -80,7 +91,7 @@ async function runIngestionJob(jobId: string, githubUrl: string, maxCommits: num
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    let { githubUrl, maxCommits = 30, fastMode = false } = body;
+    let { githubUrl, maxCommits = 30, fastMode = false, dryRun = false } = body;
 
     if (!githubUrl || typeof githubUrl !== 'string') {
       return NextResponse.json(
@@ -93,7 +104,7 @@ export async function POST(request: Request) {
     createJob(jobId, githubUrl, maxCommits);
 
     // Fire and forget
-    runIngestionJob(jobId, githubUrl, maxCommits, fastMode).catch(e => {
+    runIngestionJob(jobId, githubUrl, maxCommits, fastMode, dryRun).catch(e => {
       logger.error('Unhandled background job error', e);
     });
 

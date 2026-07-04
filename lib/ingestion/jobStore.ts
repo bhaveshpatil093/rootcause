@@ -9,6 +9,7 @@ export interface IngestionJob {
   datasetNames: string[];
   repoUrl: string;
   error?: string;
+  dryRunData?: any;
 }
 
 // In-memory global store to survive API route instantiations (though it may wipe on dev hot-reload)
