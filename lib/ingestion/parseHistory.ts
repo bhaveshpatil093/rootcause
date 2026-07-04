@@ -85,6 +85,13 @@ export async function getCommitDiff(repoPath: string, commitHash: string): Promi
     // git show <commitHash> --format= gives us the unified diff without the commit message header
     const diffString = await git.show([commitHash, '--format=']);
     
+    // Defensive check: If the unified diff for a single commit is larger than ~10MB,
+    // attempting to parse it line-by-line could OOM the Node process.
+    if (diffString.length > 10 * 1024 * 1024) {
+      logger.warn(`[getCommitDiff] Diff for commit ${commitHash} is massive (${(diffString.length / 1024 / 1024).toFixed(2)} MB). Skipping to prevent OOM.`);
+      return { commitHash, files: [] };
+    }
+
     const files: FileDiff[] = [];
     let currentFile: { file: string, added: number[], removed: number[] } | null = null;
     

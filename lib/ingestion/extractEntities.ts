@@ -47,8 +47,26 @@ export async function commitToEntity(commit: CommitLogEntry, diff: DiffResult, r
     }
 
     try {
+      // Defensive check: Skip known massive/generated files that crash AST parsers or OOM
+      const skipExtensions = ['.min.js', '.map', '.lock', '.svg', '.png', '.jpg'];
+      const skipNames = ['package-lock.json', 'yarn.lock', 'pnpm-lock.yaml'];
+      
+      if (
+        skipExtensions.some(ext => fileDiff.file.endsWith(ext)) || 
+        skipNames.includes(fileDiff.file.split('/').pop() || '')
+      ) {
+        logger.info(`[extractEntities] Skipping known binary/generated file: ${fileDiff.file}`);
+        continue;
+      }
+
       // Fetch the full content of the file exactly as it was in this commit
       const fileContent = await git.show([`${commit.hash}:${fileDiff.file}`]);
+      
+      // Defensive check: Skip if file is unreasonably large (> 1MB)
+      if (fileContent.length > 1024 * 1024) {
+         logger.warn(`[extractEntities] Skipping massive file to prevent OOM: ${fileDiff.file}`);
+         continue;
+      }
       
       // We want to map both added and removed line ranges to functions
       const allTouchedRanges = [...fileDiff.addedRanges, ...fileDiff.removedRanges];
@@ -63,9 +81,9 @@ export async function commitToEntity(commit: CommitLogEntry, diff: DiffResult, r
           commitHash: commit.hash
         });
       }
-    } catch (err) {
-      // Ignored: Usually means the file was deleted in this commit or it's binary
-      logger.warn(`[extractEntities] Could not fetch content or map functions for ${fileDiff.file} at commit ${commit.hash}`);
+    } catch (err: any) {
+      // Ignored: Usually means the file was deleted in this commit, it's binary, or git show failed
+      logger.warn(`[extractEntities] Could not fetch content or map functions for ${fileDiff.file} at commit ${commit.hash} - ${err.message}`);
     }
   }
 
