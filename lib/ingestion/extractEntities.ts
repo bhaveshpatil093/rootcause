@@ -13,9 +13,10 @@ import { logger } from './logger';
  * @param diff The parsed diff result showing files changed in this commit.
  * @param repoPath The local repository path to fetch historical file contents.
  * @param fastMode If true, skips historical file fetching and function mapping.
+ * @param repoName Optional repository name tag.
  * @returns A structured Commit object matching the shared schema, including touched files and functions.
  */
-export async function commitToEntity(commit: CommitLogEntry, diff: DiffResult, repoPath: string, fastMode: boolean = false): Promise<Commit> {
+export async function commitToEntity(commit: CommitLogEntry, diff: DiffResult, repoPath: string, fastMode: boolean = false, repoName?: string): Promise<Commit> {
   const git: SimpleGit = simpleGit({ baseDir: repoPath });
   const files: FileEntity[] = [];
   const functions: FunctionEntity[] = [];
@@ -73,6 +74,7 @@ export async function commitToEntity(commit: CommitLogEntry, diff: DiffResult, r
     message: commit.message,
     author: commit.author,
     timestamp: commit.timestamp,
+    repoName,
     files,
     functions,
     bugs,

@@ -23,6 +23,12 @@ export interface Commit {
   timestamp: string | number;
 
   /**
+   * The repository name (e.g. 'owner/repo') this commit belongs to.
+   * Useful for disambiguating data when multiple repos are ingested into the same knowledge graph.
+   */
+  repoName?: string;
+
+  /**
    * The list of files that were modified, added, or deleted in this commit.
    */
   files?: FileEntity[];

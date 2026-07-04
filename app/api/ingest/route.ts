@@ -40,10 +40,14 @@ export async function POST(request: Request) {
     const entities: Commit[] = [];
     const errors: string[] = [];
 
+    // Extract repo name from URL (e.g. https://github.com/owner/repo -> owner/repo)
+    const urlParts = githubUrl.replace(/\/$/, '').split('/');
+    const repoName = urlParts.length >= 2 ? `${urlParts[urlParts.length - 2]}/${urlParts[urlParts.length - 1]}`.replace('.git', '') : githubUrl;
+
     for (const rawCommit of commitsToProcess) {
       try {
         const diff = await getCommitDiff(destDir, rawCommit.hash);
-        const entity = await commitToEntity(rawCommit, diff, destDir, fastMode);
+        const entity = await commitToEntity(rawCommit, diff, destDir, fastMode, repoName);
         entities.push(entity);
       } catch (err: any) {
         logger.warn(`Error processing commit ${rawCommit.hash}:`, err);

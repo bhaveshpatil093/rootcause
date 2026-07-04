@@ -27,6 +27,10 @@ Date: ${dateStr}
 Message: ${cleanMessage}
 `;
     
+    if (commitEntity.repoName) {
+      description += `Repo: ${commitEntity.repoName}\n`;
+    }
+    
     if (commitEntity.files && commitEntity.files.length > 0) {
       description += `\n[RELATION: TOUCHES_FILE]\n`;
       description += commitEntity.files.map(f => `- ${f.path}`).join('\n');
