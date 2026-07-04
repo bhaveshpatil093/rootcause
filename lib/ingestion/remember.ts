@@ -31,6 +31,11 @@ export async function pushCommitsToCognee(
       description += ` — touched functions: ${funcDetails}`;
     }
     
+    if (commitEntity.bugs && commitEntity.bugs.length > 0) {
+      const bugDescriptions = commitEntity.bugs.map(b => b.description).join(', ');
+      description += `. This commit FIXES the bug: "${bugDescriptions}"`;
+    }
+    
     return { type: "text" as const, text: description };
   });
 
