@@ -15,9 +15,13 @@ export async function askRootCause(
     .map((d: any) => d.id);
     console.log("Resolved datasetIds:", datasetIds);
 
+  if (datasetIds.length === 0) {
+    throw new Error("No matching dataset found for this repo — try re-ingesting");
+  }
+
   const searchResponse = await withRetry(() => cognee.search(question, {
     topK: 10,
-    datasetIds: datasetIds.length > 0 ? datasetIds : undefined,
+    datasetIds,
   }));
 
   return searchResponse;
