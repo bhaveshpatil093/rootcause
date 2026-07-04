@@ -1,4 +1,4 @@
-import { cognee } from './cogneeClient';
+import { cognee, withRetry } from './cogneeClient';
 import { Commit } from './schema';
 import { logger } from './logger';
 /**
@@ -51,5 +51,5 @@ Message: ${cleanMessage}
   });
 
   logger.info(`[Cognee] Remembering ${entries.length} commits into dataset "${datasetName}"...`);
-  await cognee.remember(entries, datasetName);
+  await withRetry(() => cognee.remember(entries, datasetName));
 }

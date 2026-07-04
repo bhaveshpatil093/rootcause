@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { Commit } from '../../../lib/ingestion/schema';
 import { cloneRepo } from '../../../lib/ingestion/clone';
 import { getCommitLog, getCommitDiff } from '../../../lib/ingestion/parseHistory';
 import { commitToEntity } from '../../../lib/ingestion/extractEntities';
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
 
     const logs = await getCommitLog(destDir);
     const commitsToProcess = logs.slice(0, maxCommits);
-    const entities: ReturnType<typeof commitToEntity>[] = [];
+    const entities: Commit[] = [];
     const errors: string[] = [];
 
     for (const rawCommit of commitsToProcess) {
