@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { cloneRepo } from '../../../lib/ingestion/clone';
 import { getCommitLog, getCommitDiff } from '../../../lib/ingestion/parseHistory';
 import { commitToEntity } from '../../../lib/ingestion/extractEntities';
-import { pushCommitToCognee } from '../../../lib/ingestion/remember';
+import { pushCommitsToCognee } from '../../../lib/ingestion/remember';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdirSync } from 'fs';
@@ -35,27 +35,38 @@ export async function POST(request: Request) {
 
     const logs = await getCommitLog(destDir);
     const commitsToProcess = logs.slice(0, maxCommits);
-
-    let processedCount = 0;
+    const entities: ReturnType<typeof commitToEntity>[] = [];
     const errors: string[] = [];
 
     for (const rawCommit of commitsToProcess) {
       try {
         const diff = await getCommitDiff(destDir, rawCommit.hash);
         const entity = commitToEntity(rawCommit, diff);
-        await pushCommitToCognee(entity);
-        processedCount++;
+        entities.push(entity);
       } catch (err: any) {
         console.error(`Error processing commit ${rawCommit.hash}:`, err);
         errors.push(`Commit ${rawCommit.hash}: ${err.message}`);
       }
     }
 
+    // Push all successfully parsed commits to Cognee in a single batch call.
+    // Batching is required — Cognee's cognify pipeline short-circuits on
+    // repeat remember() calls to an already-completed dataset, so calling
+    // it once per commit would silently skip graph extraction for all but
+    // the first commit.
+    let processedCount = 0;
+    const datasetName = `commits-${repoHash}-${Date.now()}`;
+    if (entities.length > 0) {
+      await pushCommitsToCognee(entities, datasetName);
+      processedCount = entities.length;
+    }
+
     return NextResponse.json({
       message: 'Ingestion complete',
       processedCommits: processedCount,
       errors: errors.length > 0 ? errors : undefined,
-      repo: githubUrl
+      repo: githubUrl,
+      datasetName: datasetName
     });
 
   } catch (error: any) {
