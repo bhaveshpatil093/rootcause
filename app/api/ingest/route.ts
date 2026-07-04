@@ -9,6 +9,73 @@ import { tmpdir } from 'os';
 import { mkdirSync } from 'fs';
 import crypto from 'crypto';
 import { logger } from '../../../lib/ingestion/logger';
+import { createJob, updateJob, jobStore } from '../../../lib/ingestion/jobStore';
+
+async function runIngestionJob(jobId: string, githubUrl: string, maxCommits: number, fastMode: boolean) {
+  const repoHash = crypto.createHash('md5').update(githubUrl).digest('hex');
+  const reposBaseDir = join(tmpdir(), 'rootcause-repos');
+  const destDir = join(reposBaseDir, repoHash);
+  
+  try {
+    updateJob(jobId, { status: 'processing', message: `Cloning repository...` });
+    mkdirSync(reposBaseDir, { recursive: true });
+    
+    // Clone with a slight buffer in depth
+    await cloneRepo(githubUrl, destDir, maxCommits + 10); 
+
+    updateJob(jobId, { message: `Parsing git history...` });
+    const logs = await getCommitLog(destDir);
+    const commitsToProcess = logs.slice(0, maxCommits);
+    const entities: Commit[] = [];
+    const errors: string[] = [];
+
+    // Extract repo name from URL (e.g. https://github.com/owner/repo -> owner/repo)
+    const urlParts = githubUrl.replace(/\/$/, '').split('/');
+    const repoName = urlParts.length >= 2 ? `${urlParts[urlParts.length - 2]}/${urlParts[urlParts.length - 1]}`.replace('.git', '') : githubUrl;
+
+    updateJob(jobId, { total: commitsToProcess.length, message: `Extracting entities from ${commitsToProcess.length} commits...` });
+
+    for (let i = 0; i < commitsToProcess.length; i++) {
+      const rawCommit = commitsToProcess[i];
+      try {
+        const diff = await getCommitDiff(destDir, rawCommit.hash);
+        const entity = await commitToEntity(rawCommit, diff, destDir, fastMode, repoName);
+        entities.push(entity);
+      } catch (err: any) {
+        logger.warn(`Error processing commit ${rawCommit.hash}:`, err);
+        errors.push(`Commit ${rawCommit.hash}: ${err.message}`);
+      }
+      updateJob(jobId, { progress: i + 1, message: `Extracted entities (${i + 1}/${commitsToProcess.length})` });
+    }
+
+    const datasetNames: string[] = [];
+    const BATCH_SIZE = 10;
+    
+    for (let i = 0; i < entities.length; i += BATCH_SIZE) {
+      const batch = entities.slice(i, i + BATCH_SIZE);
+      const datasetName = `commits-${repoHash}-${Date.now()}-batch-${i / BATCH_SIZE}`;
+      
+      updateJob(jobId, { message: `Pushing batch ${i / BATCH_SIZE + 1} to Cognee...` });
+      logger.info(`Pushing batch ${i / BATCH_SIZE + 1} (${batch.length} commits) to Cognee dataset: ${datasetName}...`);
+      
+      await pushCommitsToCognee(batch, datasetName);
+      datasetNames.push(datasetName);
+      
+      logger.info(`Batch ${i / BATCH_SIZE + 1} pushed successfully.`);
+    }
+
+    updateJob(jobId, { 
+      status: 'completed', 
+      message: 'Ingestion complete', 
+      datasetNames,
+      error: errors.length > 0 ? errors.join('; ') : undefined
+    });
+
+  } catch (error: any) {
+    logger.error(`Ingestion failed for job ${jobId}:`, error);
+    updateJob(jobId, { status: 'failed', message: 'Ingestion process failed', error: error.message });
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -22,67 +89,23 @@ export async function POST(request: Request) {
       );
     }
 
-    // Generate a unique directory name for the clone using the system temp directory
-    const repoHash = crypto.createHash('md5').update(githubUrl).digest('hex');
-    const reposBaseDir = join(tmpdir(), 'rootcause-repos');
-    const destDir = join(reposBaseDir, repoHash);
-    
-    // Ensure parent dir exists
-    mkdirSync(reposBaseDir, { recursive: true });
+    const jobId = crypto.randomUUID();
+    createJob(jobId, githubUrl, maxCommits);
 
-    logger.info(`Starting ingestion for ${githubUrl} into ${destDir} (maxCommits: ${maxCommits}, fastMode: ${fastMode})`);
-    
-    // Clone with a slight buffer in depth
-    await cloneRepo(githubUrl, destDir, maxCommits + 10); 
-
-    const logs = await getCommitLog(destDir);
-    const commitsToProcess = logs.slice(0, maxCommits);
-    const entities: Commit[] = [];
-    const errors: string[] = [];
-
-    // Extract repo name from URL (e.g. https://github.com/owner/repo -> owner/repo)
-    const urlParts = githubUrl.replace(/\/$/, '').split('/');
-    const repoName = urlParts.length >= 2 ? `${urlParts[urlParts.length - 2]}/${urlParts[urlParts.length - 1]}`.replace('.git', '') : githubUrl;
-
-    for (const rawCommit of commitsToProcess) {
-      try {
-        const diff = await getCommitDiff(destDir, rawCommit.hash);
-        const entity = await commitToEntity(rawCommit, diff, destDir, fastMode, repoName);
-        entities.push(entity);
-      } catch (err: any) {
-        logger.warn(`Error processing commit ${rawCommit.hash}:`, err);
-        errors.push(`Commit ${rawCommit.hash}: ${err.message}`);
-      }
-    }
-
-    // Push all successfully parsed commits to Cognee in batches of 10.
-    // Batching is required — Cognee's cognify pipeline short-circuits on
-    // repeat remember() calls to an already-completed dataset.
-    // We create unique dataset names per batch to avoid this short-circuit.
-    const datasetNames: string[] = [];
-    const BATCH_SIZE = 10;
-    
-    for (let i = 0; i < entities.length; i += BATCH_SIZE) {
-      const batch = entities.slice(i, i + BATCH_SIZE);
-      const datasetName = `commits-${repoHash}-${Date.now()}-batch-${i / BATCH_SIZE}`;
-      logger.info(`Pushing batch ${i / BATCH_SIZE + 1} (${batch.length} commits) to Cognee dataset: ${datasetName}...`);
-      await pushCommitsToCognee(batch, datasetName);
-      datasetNames.push(datasetName);
-      logger.info(`Batch ${i / BATCH_SIZE + 1} pushed successfully.`);
-    }
-
-    return NextResponse.json({
-      message: 'Ingestion complete',
-      processedCommits: entities.length,
-      errors: errors.length > 0 ? errors : undefined,
-      repo: githubUrl,
-      datasetNames: datasetNames
+    // Fire and forget
+    runIngestionJob(jobId, githubUrl, maxCommits, fastMode).catch(e => {
+      logger.error('Unhandled background job error', e);
     });
 
+    return NextResponse.json({
+      message: 'Ingestion job started',
+      jobId,
+    }, { status: 202 });
+
   } catch (error: any) {
-    logger.error('Ingestion failed:', error);
+    logger.error('Ingestion failed to start:', error);
     return NextResponse.json(
-      { error: 'Ingestion process failed', details: error.message },
+      { error: 'Failed to start ingestion', details: error.message },
       { status: 500 }
     );
   }

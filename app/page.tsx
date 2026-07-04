@@ -56,6 +56,7 @@ export default function Home() {
   const [repoUrl, setRepoUrl] = useState('');
   const [ingesting, setIngesting] = useState(false);
   const [ingestStatus, setIngestStatus] = useState<string | null>(null);
+  const [ingestProgress, setIngestProgress] = useState<{ progress: number; total: number; message: string } | null>(null);
   const [activeDatasets, setActiveDatasets] = useState<string[]>([]);
 
   async function handleIngest(e: React.FormEvent) {
@@ -64,6 +65,7 @@ export default function Home() {
 
     setIngesting(true);
     setIngestStatus(null);
+    setIngestProgress(null);
 
     try {
       const res = await fetch('/api/ingest', {
@@ -73,17 +75,47 @@ export default function Home() {
       });
       const data = await res.json();
 
-      if (res.ok) {
-        setIngestStatus(`Case opened — ${data.processedCommits} commits added to the graph.`);
-        setActiveDatasets(data.datasetNames || []);
+      if (res.status === 202 && data.jobId) {
+        pollJob(data.jobId);
       } else {
         setIngestStatus(`Error: ${data.error || 'ingestion failed'}`);
+        setIngesting(false);
       }
     } catch (err) {
       setIngestStatus('Error: could not reach the ingestion service.');
-    } finally {
       setIngesting(false);
     }
+  }
+
+  function pollJob(jobId: string) {
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/ingest/status/${jobId}`);
+        if (!res.ok) throw new Error('Failed to fetch status');
+        const job = await res.json();
+
+        if (job.status === 'completed') {
+          clearInterval(interval);
+          setIngesting(false);
+          setIngestStatus(`Case opened — ${job.total} commits added to the graph.`);
+          setIngestProgress(null);
+          setActiveDatasets(job.datasetNames || []);
+        } else if (job.status === 'failed') {
+          clearInterval(interval);
+          setIngesting(false);
+          setIngestStatus(`Error: ${job.error || job.message}`);
+          setIngestProgress(null);
+        } else {
+          setIngestProgress({
+            progress: job.progress || 0,
+            total: job.total || 0,
+            message: job.message
+          });
+        }
+      } catch (e) {
+        console.error('Polling error', e);
+      }
+    }, 2000);
   }
 
   const activeCase = cases.find((c) => c.id === activeId) || null;
@@ -168,7 +200,26 @@ export default function Home() {
           </button>
         </form>
 
-        {ingestStatus && (
+        {ingestProgress && (
+          <div className="mt-4 flex flex-col gap-1 max-w-md">
+            <div className="flex justify-between text-xs font-mono text-[var(--muted)]">
+              <span>{ingestProgress.message}</span>
+              {ingestProgress.total > 0 && (
+                <span>{ingestProgress.progress} / {ingestProgress.total}</span>
+              )}
+            </div>
+            {ingestProgress.total > 0 && (
+              <div className="w-full bg-[var(--panel)] border border-[var(--panel-border)] rounded-full h-2 mt-1 overflow-hidden">
+                <div 
+                  className="bg-[var(--amber)] h-full transition-all duration-300 ease-out"
+                  style={{ width: `${Math.max(5, (ingestProgress.progress / ingestProgress.total) * 100)}%` }}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {ingestStatus && !ingestProgress && (
           <p className="font-mono text-xs mt-2 text-[var(--muted)]">{ingestStatus}</p>
         )}
       </header>
