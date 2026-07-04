@@ -12,8 +12,13 @@ export async function getCommitLog(repoPath: string): Promise<CommitLogEntry[]> 
   const git: SimpleGit = simpleGit({ baseDir: repoPath });
   
   try {
-    // simple-git's log() method returns commits sorted most recent first by default
-    const logSummary = await git.log();
+    // We explicitly exclude merge commits from the history log using '--no-merges'.
+    // NOTE FOR PERSON 2 (Graph/UI Builder): 
+    // Merge commits have confusing, massive diffs that represent all changes from an entire branch.
+    // If we included them, the graph would contain noisy nodes that double-count code changes.
+    // By skipping them, we strictly process the granular individual branch commits, 
+    // ensuring the graph accurately maps specific code lines to their actual original author and intent.
+    const logSummary = await git.log(['--no-merges']);
 
     return logSummary.all.map((commit) => ({
       hash: commit.hash,
