@@ -29,8 +29,8 @@ Demonstrate how RootCause can analyze a messy, real-world repository (Axios) to 
 **Action:**
 1. In the "OPEN CASE FILE" input box, paste: `https://github.com/axios/axios`
 2. Click **Analyze Repository**.
-3. *Switch to the terminal running the dev server to show the beautiful colored logs (`ℹ️ [RootCause] Extracting AST...`).*
-4. Explain that we are extracting Entities (Bugs, Commits, Functions) and mapping the relationships (`FIXED_BY`, `TOUCHES`).
+3. **Point out the Ingestion Progress Bar**: Explain that the async architecture is kicking off a job. We clone the repo, extract ASTs, and use the LLM to build `Bug` and `Fix` entities. Show the progress updating in real-time on the screen.
+4. *Switch to the terminal running the dev server to show the beautiful colored logs (`ℹ️ [RootCause] Extracting AST...`) as a visual backup.*
 
 ## Step 3: Investigation (3:00 - 4:30)
 
@@ -38,18 +38,18 @@ Demonstrate how RootCause can analyze a messy, real-world repository (Axios) to 
 > "Now that our codebase's history is in the graph, we can debug with context. Let's imagine we ran into a bug with abort controllers or network timeouts—classic Axios issues. Let's ask RootCause if this has happened before."
 
 **Action:**
-1. Wait for the ingestion progress bar in the UI to reach 100% and show "Case opened!".
+1. Wait for the ingestion progress bar in the UI to reach 100% and show "Case opened! X commits, Y fixes, Z functions mapped."
 2. In the Investigation search box, type a query relevant to Axios, such as: 
    *`"Why did the abort controller timeout bug happen, and has it resurfaced before?"`*
 3. Click **Investigate**.
-4. RootCause will query the vector database to understand "abort controller timeout", find the `Bug` node, traverse the graph to the fix `Commit`, see if any newer commits `REVERTED_BY` it, and generate an answer.
+4. RootCause queries the LanceDB vector database, pulling the exact semantic scope (`commits-[hash]-...`) we just built. It forces the LLM to output a strict JSON response analyzing the `RESOLVES_BUG` and `IS_RELATED_TO` relationships.
 
 ## Step 4: The Reveal (4:30 - 5:00)
 
 **Action:**
-1. The UI will render the answer in the Analysis box.
-2. Point out the **Investigation Verdict** badge on the right side. It will clearly label if the bug is **RESOLVED**, **RESURFACED**, or has **NO PRIOR RECORD**.
-3. Point out the **Related Commits** list, proving that the AI is citing exact Git SHAs from the graph traversal rather than hallucinating.
+1. The UI will parse the JSON and render the answer in the Analysis box.
+2. Point out the **Investigation Verdict** badge on the right side. It will clearly label if the bug is **RESOLVED**, **RESURFACED**, or has **NO PRIOR RECORD** — explicitly driven by the `held: boolean` flag in the graph, not a regex guess.
+3. Point out the **Related Commits** list underneath, proving that the AI is citing exact Git SHAs directly from the graph traversal rather than hallucinating.
 
 **Speaker Track:**
 > "As you can see, RootCause didn't just guess—it cited the exact commit hashes where this logic was introduced and modified. Debugging is no longer déjà vu. Thank you."
