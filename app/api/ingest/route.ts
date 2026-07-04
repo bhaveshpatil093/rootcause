@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     for (const rawCommit of commitsToProcess) {
       try {
         const diff = await getCommitDiff(destDir, rawCommit.hash);
-        const entity = commitToEntity(rawCommit, diff);
+        const entity = await commitToEntity(rawCommit, diff, destDir);
         entities.push(entity);
       } catch (err: any) {
         console.error(`Error processing commit ${rawCommit.hash}:`, err);

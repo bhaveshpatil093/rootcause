@@ -26,6 +26,11 @@ export interface Commit {
    * The list of files that were modified, added, or deleted in this commit.
    */
   files?: FileEntity[];
+
+  /**
+   * The list of functions that were touched in this commit.
+   */
+  functions?: FunctionEntity[];
 }
 
 /**
@@ -51,6 +56,11 @@ export interface FunctionEntity {
    * The path of the file where this function is defined, or a reference to the FileEntity itself. 
    */
   file: string | FileEntity;
+
+  /**
+   * The hash of the commit that touched this function.
+   */
+  commitHash?: string;
 }
 
 /**
