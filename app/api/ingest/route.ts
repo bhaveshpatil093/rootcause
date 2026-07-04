@@ -12,7 +12,11 @@ import { logger } from '../../../lib/ingestion/logger';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { githubUrl, maxCommits = 30, fastMode = false } = body;
+    let { githubUrl, maxCommits = 3, fastMode = false } = body;
+    
+    // STRICT CAP: Free tier LLMs (like NVIDIA Nim) have severe rate limits. 
+    // Cognee parallelizes graph extraction, so anything > 3 will likely trigger HTTP 429s.
+    maxCommits = Math.min(maxCommits, 3);
 
     if (!githubUrl || typeof githubUrl !== 'string') {
       return NextResponse.json(
