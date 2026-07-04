@@ -36,10 +36,10 @@ function extractFunctionName(line: string): string | null {
   if (match) return match[1];
 
   // C-like languages (Java, C++, C#, generic fallback)
-  // Matches: optional modifiers -> optional return type -> name -> (
-  match = line.match(/^\s*(?:(?:public|private|protected|static|export|default|async|virtual|override)\s+)*(?:[\w<>\[\]]+\s+)?([a-zA-Z_]\w*)\s*\(/);
+  // Matches: optional modifiers -> optional return type -> name -> (args) -> optional throws/etc -> {
+  match = line.match(/^\s*(?:(?:public|private|protected|static|export|default|async|virtual|override)\s+)*(?:[\w<>\[\]]+\s+)?([a-zA-Z_]\w*)\s*\([^)]*\)[^{;]*\{/);
   if (match) {
-    const reserved = ['if', 'for', 'while', 'switch', 'catch', 'return', 'new', 'super', 'this'];
+    const reserved = ['if', 'for', 'while', 'switch', 'catch', 'new'];
     if (!reserved.includes(match[1])) {
       return match[1];
     }
