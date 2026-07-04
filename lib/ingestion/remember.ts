@@ -1,5 +1,6 @@
 import { cognee } from './cogneeClient';
 import { Commit } from './schema';
+import { logger } from './logger';
 /**
  * Formats an array of Commit entities into clear text descriptions and pushes
  * them to Cognee memory in a single batch call. Batching is required because
@@ -33,6 +34,6 @@ export async function pushCommitsToCognee(
     return { type: "text" as const, text: description };
   });
 
-  console.log(`[Cognee] Remembering ${entries.length} commits into dataset "${datasetName}"...`);
+  logger.info(`[Cognee] Remembering ${entries.length} commits into dataset "${datasetName}"...`);
   await cognee.remember(entries, datasetName);
 }

@@ -7,6 +7,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdirSync } from 'fs';
 import crypto from 'crypto';
+import { logger } from '../../../lib/ingestion/logger';
 
 export async function POST(request: Request) {
   try {
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
     // Ensure parent dir exists
     mkdirSync(reposBaseDir, { recursive: true });
 
-    console.log(`Starting ingestion for ${githubUrl} into ${destDir} (maxCommits: ${maxCommits}, fastMode: ${fastMode})`);
+    logger.info(`Starting ingestion for ${githubUrl} into ${destDir} (maxCommits: ${maxCommits}, fastMode: ${fastMode})`);
     
     // Clone with a slight buffer in depth
     await cloneRepo(githubUrl, destDir, maxCommits + 10); 
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
         const entity = await commitToEntity(rawCommit, diff, destDir, fastMode);
         entities.push(entity);
       } catch (err: any) {
-        console.error(`Error processing commit ${rawCommit.hash}:`, err);
+        logger.warn(`Error processing commit ${rawCommit.hash}:`, err);
         errors.push(`Commit ${rawCommit.hash}: ${err.message}`);
       }
     }
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
     });
 
   } catch (error: any) {
-    console.error('Ingestion failed:', error);
+    logger.error('Ingestion failed:', error);
     return NextResponse.json(
       { error: 'Ingestion process failed', details: error.message },
       { status: 500 }

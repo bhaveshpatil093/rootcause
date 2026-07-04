@@ -1,6 +1,7 @@
 import { parse } from '@babel/parser';
 import _traverse from '@babel/traverse';
 import { LineRange } from './parseHistory';
+import { logger } from './logger';
 
 // Handle interoperability for Babel traverse in different module environments
 const traverse = typeof _traverse === 'function' ? _traverse : (_traverse as any).default;
@@ -141,7 +142,7 @@ export function mapLinesToFunctions(filePath: string, lineRanges: LineRange[], f
 
     return Array.from(matchedFunctions);
   } catch (error) {
-    console.warn(`[mapFunctions] Failed to parse AST for ${filePath}. Falling back to regex mapping.`);
+    logger.warn(`[mapFunctions] Failed to parse AST for ${filePath}. Falling back to regex mapping.`);
     return mapLinesToFunctionsRegex(lineRanges, fileContent);
   }
 }

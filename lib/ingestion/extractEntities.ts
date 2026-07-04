@@ -2,6 +2,7 @@ import { Commit, FileEntity, FunctionEntity } from './schema';
 import { CommitLogEntry, DiffResult } from './parseHistory';
 import { mapLinesToFunctions } from './mapFunctions';
 import { simpleGit, SimpleGit } from 'simple-git';
+import { logger } from './logger';
 
 /**
  * Converts a raw commit and its corresponding diff into a standardized Commit entity,
@@ -45,7 +46,7 @@ export async function commitToEntity(commit: CommitLogEntry, diff: DiffResult, r
       }
     } catch (err) {
       // Ignored: Usually means the file was deleted in this commit or it's binary
-      console.warn(`[extractEntities] Could not fetch content or map functions for ${fileDiff.file} at commit ${commit.hash}`);
+      logger.warn(`[extractEntities] Could not fetch content or map functions for ${fileDiff.file} at commit ${commit.hash}`);
     }
   }
 

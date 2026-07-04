@@ -1,5 +1,6 @@
 import { simpleGit, SimpleGit } from 'simple-git';
 import { existsSync } from 'fs';
+import { logger } from './logger';
 import { join } from 'path';
 
 /**
@@ -16,23 +17,23 @@ export async function cloneRepo(githubUrl: string, destDir: string, depth: numbe
     const isRepoExists = existsSync(destDir) && existsSync(join(destDir, '.git'));
 
     if (isRepoExists) {
-      console.log(`Repository already exists at ${destDir}. Pulling latest changes...`);
+      logger.info(`Repository already exists at ${destDir}. Pulling latest changes...`);
       const git: SimpleGit = simpleGit({ baseDir: destDir });
       
       // Fetch and pull latest changes
       await git.pull();
-      console.log(`Successfully pulled latest changes for ${destDir}`);
+      logger.info(`Successfully pulled latest changes for ${destDir}`);
     } else {
-      console.log(`Cloning repository ${githubUrl} to ${destDir} with depth ${depth}...`);
+      logger.info(`Cloning repository ${githubUrl} to ${destDir} with depth ${depth}...`);
       const git: SimpleGit = simpleGit();
       
       // Perform shallow clone
       await git.clone(githubUrl, destDir, ['--depth', depth.toString()]);
-      console.log(`Successfully cloned ${githubUrl} to ${destDir}`);
+      logger.info(`Successfully cloned ${githubUrl} to ${destDir}`);
     }
   } catch (error: any) {
-    console.error(`Failed to clone or pull repository: ${githubUrl}`);
-    console.error(`Error details: ${error.message}`);
+    logger.error(`Failed to clone or pull repository: ${githubUrl}`);
+    logger.error(`Error details: ${error.message}`);
     throw new Error(`Git operation failed: ${error.message}`);
   }
 }

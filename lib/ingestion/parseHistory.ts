@@ -1,4 +1,5 @@
 import { simpleGit, SimpleGit } from 'simple-git';
+import { logger } from './logger';
 import { Commit as CommitLogEntry } from './schema';
 
 /**
@@ -22,7 +23,7 @@ export async function getCommitLog(repoPath: string): Promise<CommitLogEntry[]> 
       timestamp: commit.date, 
     }));
   } catch (error: any) {
-    console.error(`Failed to get commit log for repository at ${repoPath}`);
+    logger.error(`Failed to get commit log for repository at ${repoPath}`);
     throw new Error(`Git log failed: ${error.message}`);
   }
 }
@@ -141,7 +142,7 @@ export async function getCommitDiff(repoPath: string, commitHash: string): Promi
       files
     };
   } catch (error: any) {
-    console.error(`Failed to get commit diff for ${commitHash} at ${repoPath}`);
+    logger.error(`Failed to get commit diff for ${commitHash} at ${repoPath}`);
     throw new Error(`Git show failed: ${error.message}`);
   }
 }
