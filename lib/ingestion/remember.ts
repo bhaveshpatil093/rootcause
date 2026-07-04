@@ -19,7 +19,17 @@ export async function pushCommitsToCognee(
     const dateStr = new Date(commitEntity.timestamp).toISOString().split('T')[0];
     const fileNames = commitEntity.files?.map(f => f.path).join(', ') || 'none';
     const cleanMessage = commitEntity.message.split('\n')[0].trim();
-    const description = `Commit ${shortHash} by ${commitEntity.author} on ${dateStr}: '${cleanMessage}' — touched files: ${fileNames}`;
+    
+    let description = `Commit ${shortHash} by ${commitEntity.author} on ${dateStr}: '${cleanMessage}' — touched files: ${fileNames}`;
+    
+    const funcDetails = commitEntity.functions
+      ?.map(fn => `${fn.name} in ${typeof fn.file === 'string' ? fn.file : fn.file.path}`)
+      .join(', ');
+      
+    if (funcDetails) {
+      description += ` — touched functions: ${funcDetails}`;
+    }
+    
     return { type: "text" as const, text: description };
   });
 
