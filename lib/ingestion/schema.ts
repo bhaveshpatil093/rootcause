@@ -31,6 +31,16 @@ export interface Commit {
    * The list of functions that were touched in this commit.
    */
   functions?: FunctionEntity[];
+
+  /**
+   * The list of bugs identified by or resolved in this commit.
+   */
+  bugs?: Bug[];
+
+  /**
+   * The list of fixes implemented in this commit.
+   */
+  fixes?: Fix[];
 }
 
 /**

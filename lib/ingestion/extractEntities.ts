@@ -1,7 +1,8 @@
-import { Commit, FileEntity, FunctionEntity } from './schema';
+import { Commit, FileEntity, FunctionEntity, Bug, Fix } from './schema';
 import { CommitLogEntry, DiffResult } from './parseHistory';
 import { mapLinesToFunctions } from './mapFunctions';
 import { simpleGit, SimpleGit } from 'simple-git';
+import { isFixCommit, extractBugDescription } from './detectFixes';
 import { logger } from './logger';
 
 /**
@@ -18,6 +19,23 @@ export async function commitToEntity(commit: CommitLogEntry, diff: DiffResult, r
   const git: SimpleGit = simpleGit({ baseDir: repoPath });
   const files: FileEntity[] = [];
   const functions: FunctionEntity[] = [];
+  const bugs: Bug[] = [];
+  const fixes: Fix[] = [];
+
+  if (isFixCommit(commit.message)) {
+    const bugDescription = extractBugDescription(commit.message);
+    const bug: Bug = {
+      description: bugDescription,
+      errorSignature: 'unknown' // extracted later via LLM or left unknown
+    };
+    const fix: Fix = {
+      commitHash: commit.hash,
+      resolvesBug: bug,
+      held: false
+    };
+    bugs.push(bug);
+    fixes.push(fix);
+  }
 
   for (const fileDiff of diff.files) {
     const fileEntity = { path: fileDiff.file };
@@ -57,5 +75,7 @@ export async function commitToEntity(commit: CommitLogEntry, diff: DiffResult, r
     timestamp: commit.timestamp,
     files,
     functions,
+    bugs,
+    fixes,
   };
 }
