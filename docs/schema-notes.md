@@ -36,3 +36,9 @@ This simplistic approach has several trade-offs:
 3. **Missing Context**: The heuristic relies entirely on the commit message. If the message says *"fix typo"*, the system registers a bug described as "Typo", without understanding the severity or context.
 
 Future iterations of RootCause may offload this to a lightweight, fine-tuned local classification model to improve accuracy without sacrificing speed.
+
+## Multi-Repository Support
+
+In order to scale the knowledge graph across multiple codebases without causing entity conflation (e.g., mixing up a `Commit` from `repoA` with a `Commit` from `repoB`), we introduced a `repoName` property to the base `Commit` schema.
+
+By tagging every extracted commit with its corresponding repository (e.g., `bhaveshpatil093/rootcause`), the Cognee graph structure remains strictly partitioned by repository. This ensures that graph traversals and memory retrievals during `/api/recall` queries are scoped appropriately and do not hallucinate cross-repository bug relationships.
