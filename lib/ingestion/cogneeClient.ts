@@ -1,12 +1,12 @@
 import { Cognee } from '@cognee/cognee-ts';
 
 export const cognee = new Cognee({
-  llmProvider: "openai",
-  llmModel: "meta/llama-3.1-8b-instruct",
-  llmApiKey: process.env.NVIDIA_API_KEY || "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",
-  llmEndpoint: "https://integrate.api.nvidia.com/v1",
-  embeddingProvider: "onnx",
-  embeddingModel: "bge-small-en-v1.5",
+  llmProvider: process.env.COGNEE_LLM_PROVIDER || "openai",
+  llmModel: process.env.COGNEE_LLM_MODEL || "meta/llama-3.1-8b-instruct",
+  llmApiKey: process.env.NVIDIA_API_KEY || "", // Must be provided in .env.local
+  llmEndpoint: process.env.COGNEE_LLM_ENDPOINT || "https://integrate.api.nvidia.com/v1",
+  embeddingProvider: process.env.COGNEE_EMBEDDING_PROVIDER || "onnx",
+  embeddingModel: process.env.COGNEE_EMBEDDING_MODEL || "bge-small-en-v1.5",
 });
 
 /**
