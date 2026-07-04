@@ -51,6 +51,16 @@ async function runIngestionJob(jobId: string, githubUrl: string, maxCommits: num
 
     const stats = calculateStats(entities, errors);
 
+    if (entities.length === 0) {
+      updateJob(jobId, {
+        status: 'failed',
+        message: 'No data ingested (no valid commits found)',
+        error: errors.length > 0 ? errors.join('; ') : 'Repository empty or no commits matching criteria',
+        stats
+      });
+      return;
+    }
+
     if (dryRun) {
       updateJob(jobId, {
         status: 'completed',
