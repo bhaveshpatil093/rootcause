@@ -4,7 +4,7 @@ async function main() {
   console.log("--- Cognee SDK Sanity Check ---");
 
   try {
-    // NOTE: An LLM_API_KEY or OPENAI_API_KEY is required in your environment variables for this to succeed.
+    // NOTE: NVIDIA_API_KEY is required in your environment variables for this to succeed.
     console.log("Remembering: { type: 'text', text: 'test string' } into dataset 'test-dataset'");
     await cognee.remember({ type: "text", text: "test string" }, "test-dataset");
     

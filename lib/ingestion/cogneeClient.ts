@@ -1,6 +1,11 @@
 import { Cognee } from '@cognee/cognee-ts';
 import { logger } from './logger';
 
+if (!process.env.NVIDIA_API_KEY) {
+  logger.error("CRITICAL: NVIDIA_API_KEY is missing from environment variables.");
+  throw new Error("NVIDIA_API_KEY is required to initialize Cognee. Please add it to your .env.local file.");
+}
+
 export const cognee = new Cognee({
   llmProvider: process.env.COGNEE_LLM_PROVIDER || "openai",
   llmModel: process.env.COGNEE_LLM_MODEL || "meta/llama-3.1-8b-instruct",
