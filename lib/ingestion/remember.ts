@@ -18,25 +18,36 @@ export async function pushCommitsToCognee(
   const entries = commits.map((commitEntity) => {
     const shortHash = commitEntity.hash.substring(0, 7);
     const dateStr = new Date(commitEntity.timestamp).toISOString().split('T')[0];
-    const fileNames = commitEntity.files?.map(f => f.path).join(', ') || 'none';
     const cleanMessage = commitEntity.message.split('\n')[0].trim();
     
-    let description = `Commit ${shortHash} by ${commitEntity.author} on ${dateStr}: '${cleanMessage}' — touched files: ${fileNames}`;
+    let description = `[ENTITY: COMMIT]
+Hash: ${shortHash}
+Author: ${commitEntity.author}
+Date: ${dateStr}
+Message: ${cleanMessage}
+`;
     
-    const funcDetails = commitEntity.functions
-      ?.map(fn => `${fn.name} in ${typeof fn.file === 'string' ? fn.file : fn.file.path}`)
-      .join(', ');
-      
-    if (funcDetails) {
-      description += ` — touched functions: ${funcDetails}`;
+    if (commitEntity.files && commitEntity.files.length > 0) {
+      description += `\n[RELATION: TOUCHES_FILE]\n`;
+      description += commitEntity.files.map(f => `- ${f.path}`).join('\n');
+      description += `\n`;
+    }
+
+    if (commitEntity.functions && commitEntity.functions.length > 0) {
+      description += `\n[RELATION: TOUCHES_FUNCTION]\n`;
+      description += commitEntity.functions
+        .map(fn => `- ${fn.name} in ${typeof fn.file === 'string' ? fn.file : fn.file.path}`)
+        .join('\n');
+      description += `\n`;
     }
     
     if (commitEntity.bugs && commitEntity.bugs.length > 0) {
-      const bugDescriptions = commitEntity.bugs.map(b => b.description).join(', ');
-      description += `. This commit FIXES the bug: "${bugDescriptions}"`;
+      description += `\n[RELATION: RESOLVES_BUG]\n`;
+      description += commitEntity.bugs.map(b => `- ${b.description}`).join('\n');
+      description += `\n`;
     }
     
-    return { type: "text" as const, text: description };
+    return { type: "text" as const, text: description.trim() };
   });
 
   logger.info(`[Cognee] Remembering ${entries.length} commits into dataset "${datasetName}"...`);
