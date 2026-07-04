@@ -10,9 +10,10 @@ import { simpleGit, SimpleGit } from 'simple-git';
  * @param commit The raw commit log entry.
  * @param diff The parsed diff result showing files changed in this commit.
  * @param repoPath The local repository path to fetch historical file contents.
+ * @param fastMode If true, skips historical file fetching and function mapping.
  * @returns A structured Commit object matching the shared schema, including touched files and functions.
  */
-export async function commitToEntity(commit: CommitLogEntry, diff: DiffResult, repoPath: string): Promise<Commit> {
+export async function commitToEntity(commit: CommitLogEntry, diff: DiffResult, repoPath: string, fastMode: boolean = false): Promise<Commit> {
   const git: SimpleGit = simpleGit({ baseDir: repoPath });
   const files: FileEntity[] = [];
   const functions: FunctionEntity[] = [];
@@ -20,6 +21,10 @@ export async function commitToEntity(commit: CommitLogEntry, diff: DiffResult, r
   for (const fileDiff of diff.files) {
     const fileEntity = { path: fileDiff.file };
     files.push(fileEntity);
+
+    if (fastMode) {
+      continue;
+    }
 
     try {
       // Fetch the full content of the file exactly as it was in this commit

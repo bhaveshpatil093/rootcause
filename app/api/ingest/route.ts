@@ -11,7 +11,7 @@ import crypto from 'crypto';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { githubUrl, maxCommits = 30 } = body;
+    const { githubUrl, maxCommits = 30, fastMode = false } = body;
 
     if (!githubUrl || typeof githubUrl !== 'string') {
       return NextResponse.json(
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
     // Ensure parent dir exists
     mkdirSync(reposBaseDir, { recursive: true });
 
-    console.log(`Starting ingestion for ${githubUrl} into ${destDir}`);
+    console.log(`Starting ingestion for ${githubUrl} into ${destDir} (maxCommits: ${maxCommits}, fastMode: ${fastMode})`);
     
     // Clone with a slight buffer in depth
     await cloneRepo(githubUrl, destDir, maxCommits + 10); 
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     for (const rawCommit of commitsToProcess) {
       try {
         const diff = await getCommitDiff(destDir, rawCommit.hash);
-        const entity = await commitToEntity(rawCommit, diff, destDir);
+        const entity = await commitToEntity(rawCommit, diff, destDir, fastMode);
         entities.push(entity);
       } catch (err: any) {
         console.error(`Error processing commit ${rawCommit.hash}:`, err);
