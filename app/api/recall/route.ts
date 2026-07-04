@@ -12,9 +12,15 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await askRootCause(question, {
+    const timeoutPromise = new Promise<any>((_, reject) =>
+      setTimeout(() => reject(new Error('Request timed out after 15 seconds. The knowledge graph may be overloaded.')), 15000)
+    );
+
+    const recallPromise = askRootCause(question, {
       datasetNames: Array.isArray(datasetNames) && datasetNames.length > 0 ? datasetNames : undefined,
     });
+
+    const result = await Promise.race([recallPromise, timeoutPromise]);
     const answer =
       result?.result?.kind === 'Text'
         ? result.result.data
