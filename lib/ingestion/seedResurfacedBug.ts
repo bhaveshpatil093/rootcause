@@ -1,22 +1,17 @@
+import 'dotenv/config';
 import { simpleGit, SimpleGit } from 'simple-git';
 import { join } from 'path';
 import { writeFileSync, mkdirSync, rmSync } from 'fs';
 import { logger } from './logger';
-import { getCommitLog, getCommitDiff } from './parseHistory';
-import { commitToEntity } from './extractEntities';
-import { pushCommitsToCognee } from './remember';
-import { markFixAsReverted } from './markFixStatus';
 
-/**
- * Creates a synthetic local Git repository with a guaranteed "resurfaced bug" scenario.
- * This is perfect for demoing the graph relationships without relying on real-world repositories.
- */
 async function seedSyntheticRepo() {
   const repoPath = join(process.cwd(), 'tmp-repos', 'synthetic-demo');
+  const cachedRepoPath = join(require('os').tmpdir(), 'rootcause-repos', require('crypto').createHash('md5').update(repoPath).digest('hex'));
   
   // Clean up any old runs
   try {
     rmSync(repoPath, { recursive: true, force: true });
+    rmSync(cachedRepoPath, { recursive: true, force: true });
   } catch (e) {}
   
   mkdirSync(repoPath, { recursive: true });
@@ -24,7 +19,6 @@ async function seedSyntheticRepo() {
   const git: SimpleGit = simpleGit({ baseDir: repoPath });
   await git.init();
 
-  // Set up local git config so commits don't fail in headless environments
   await git.addConfig('user.name', 'Demo User');
   await git.addConfig('user.email', 'demo@rootcause.local');
 
@@ -32,65 +26,88 @@ async function seedSyntheticRepo() {
 
   // 1. Initial State
   const filePath = join(repoPath, 'calculator.ts');
-  let code = `export function divide(a: number, b: number) {
-  return a / b;
-}`;
+  let code = `export function divide(a: number, b: number) {\n  return a / b;\n}`;
   writeFileSync(filePath, code);
   await git.add('calculator.ts');
   await git.commit('feat: initial calculator implementation');
 
   // 2. The Bug Fix
-  code = `export function divide(a: number, b: number) {
-  if (b === 0) throw new Error("Divide by zero");
-  return a / b;
-}`;
+  code = `export function divide(a: number, b: number) {\n  if (b === 0) throw new Error("Divide by zero");\n  return a / b;\n}`;
   writeFileSync(filePath, code);
   await git.add('calculator.ts');
   const fixCommit = await git.commit('fix: resolve divide by zero crash in calculator');
   logger.info(`[SyntheticDemo] Created FIX commit: ${fixCommit.commit}`);
 
   // 3. The Resurfaced Bug (Regression)
-  code = `export function divide(a: number, b: number) {
-  // Optimized for speed
-  return a / b;
-}`;
+  code = `export function divide(a: number, b: number) {\n  // Optimized for speed\n  return a / b;\n}`;
   writeFileSync(filePath, code);
   await git.add('calculator.ts');
   const regressionCommit = await git.commit('refactor: optimize calculator for speed');
   logger.info(`[SyntheticDemo] Created REGRESSION commit: ${regressionCommit.commit}`);
 
-  // --- Ingest the Synthetic Repo ---
-  logger.info(`[SyntheticDemo] Starting ingestion of synthetic repo...`);
-  const logs = await getCommitLog(repoPath);
+  return { repoPath, fixHash: fixCommit.commit, regressionHash: regressionCommit.commit };
+}
+
+async function runDemo() {
+  const { repoPath, fixHash } = await seedSyntheticRepo();
+
+  console.log("\n--- Starting Ingestion via API ---");
+  const ingestRes = await fetch('http://localhost:3000/api/ingest', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      githubUrl: repoPath, // Using local path directly
+      maxCommits: 5,
+      dryRun: false
+    })
+  });
   
-  const entities = [];
-  for (const log of logs) {
-    const diff = await getCommitDiff(repoPath, log.hash);
-    const entity = await commitToEntity(log, diff, repoPath);
-    entities.push(entity);
+  const ingestData = await ingestRes.json();
+  const jobId = ingestData.jobId;
+  console.log("Job ID:", jobId);
+
+  let datasetNames: string[] = [];
+  
+  while (true) {
+    const statusRes = await fetch(`http://localhost:3000/api/ingest/status/${jobId}`);
+    const statusData = await statusRes.json();
+    console.log(`Status: ${statusData.status} - ${statusData.message}`);
+    
+    if (statusData.status === 'completed') {
+      datasetNames = statusData.datasetNames || [];
+      console.log("Ingestion Stats:", statusData.stats);
+      break;
+    } else if (statusData.status === 'failed') {
+      console.error("Ingestion failed:", statusData.error);
+      return;
+    }
+    await new Promise(r => setTimeout(r, 2000));
   }
 
-  // Push the commits to Cognee memory
-  logger.info(`[SyntheticDemo] Pushing synthetic commits to Cognee...`);
-  // NOTE: This will fail if LLM_API_KEY is missing, but the script is ready for when it's configured.
-  try {
-    await pushCommitsToCognee(entities, 'synthetic-demo-dataset');
-    
-    // Explicitly mark the fix as reverted because the bug resurfaced!
-    await markFixAsReverted(fixCommit.commit, "Regression caused by speed optimization refactor");
-    
-    logger.info(`[SyntheticDemo] Successfully seeded and ingested the resurfaced bug scenario!`);
-  } catch (error: any) {
-    logger.warn(`[SyntheticDemo] Ingestion failed (likely due to missing LLM_API_KEY). Setup complete otherwise!`);
-  }
+  console.log("\n--- Simulating Revert/Resurface via API marking ---");
+  // The system usually detects this through LLM recall matching, but for deterministic demoing
+  // we use our explicit utility just like before.
+  await fetch('http://localhost:3000/api/mock-revert', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ commitHash: fixHash, reason: "Regression caused by speed optimization refactor" })
+  });
+
+  console.log("\n--- Querying Recall API ---");
+  const question = "Why did the calculator divide by zero crash happen, and has it been fixed?";
+  console.log(`Q: ${question}`);
+  
+  const recallRes = await fetch('http://localhost:3000/api/recall', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      question,
+      datasetNames
+    })
+  });
+
+  const recallData = await recallRes.json();
+  console.log(`\nA: ${recallData.answer}`);
 }
 
-// Execute if run directly
-if (import.meta.url === \`file://\${process.argv[1]}\`) {
-  seedSyntheticRepo()
-    .then(() => process.exit(0))
-    .catch((err) => {
-      console.error(err);
-      process.exit(1);
-    });
-}
+runDemo().catch(console.error);
