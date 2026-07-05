@@ -72,12 +72,26 @@ export default function RepoStructureGraph({ url }: { url: string }) {
         items.forEach((item: any) => {
           pathSet.add(item.path);
           const isDir = item.type === 'tree';
+          const name = item.path.split('/').pop() || item.path;
           
+          let color = '#9ca3af';
+          let val = 3;
+          if (isDir) {
+            color = '#60a5fa'; // Blue
+            val = 6;
+          } else if (name.match(/\.(ts|tsx|js|jsx)$/)) {
+            color = '#a78bfa'; // Purple
+            val = 4;
+          } else if (name.match(/\.(md|json|yml|yaml)$/)) {
+            color = '#34d399'; // Emerald
+            val = 4;
+          }
+
           nodes.push({
             id: item.path,
-            name: item.path.split('/').pop() || item.path,
-            val: isDir ? 10 : 3,
-            color: isDir ? '#60a5fa' : '#9ca3af' // Blue for dirs, Gray for files
+            name: name,
+            val: val,
+            color: color
           });
 
           // Link to parent
@@ -137,15 +151,43 @@ export default function RepoStructureGraph({ url }: { url: string }) {
               width={dimensions.width}
               height={dimensions.height}
               graphData={graphData}
-              nodeLabel="name"
-              nodeColor="color"
               nodeRelSize={4}
-              linkColor={() => 'rgba(255, 255, 255, 0.1)'}
+              linkColor={() => 'rgba(255, 255, 255, 0.15)'}
+              linkWidth={1}
+              linkDirectionalParticles={2}
+              linkDirectionalParticleWidth={1.5}
+              linkDirectionalParticleSpeed={0.005}
+              linkDirectionalParticleColor={() => 'rgba(96, 165, 250, 0.8)'}
               backgroundColor="transparent"
               enableZoomInteraction={true}
               enablePanInteraction={true}
               enablePointerInteraction={true}
-              cooldownTicks={100} // Stop moving quickly
+              cooldownTicks={100}
+              nodeCanvasObject={(node: any, ctx, globalScale) => {
+                const label = node.name;
+                const fontSize = 12 / globalScale;
+                ctx.font = `${fontSize}px Sans-Serif`;
+                
+                // Draw circle with glow
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, node.val, 0, 2 * Math.PI, false);
+                ctx.fillStyle = node.color || '#9ca3af';
+                ctx.shadowColor = node.color || '#9ca3af';
+                ctx.shadowBlur = 10;
+                ctx.fill();
+                
+                // Draw label if zoomed in enough or if it's a directory/root
+                if (globalScale > 1.5 || node.val > 5) {
+                  ctx.shadowBlur = 0; // reset shadow for crisp text
+                  ctx.textAlign = 'center';
+                  ctx.textBaseline = 'middle';
+                  ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                  ctx.fillText(label, node.x, node.y + node.val + (fontSize * 1.2));
+                }
+                
+                // Reset shadow for next operations
+                ctx.shadowBlur = 0;
+              }}
             />
           </div>
         )}
