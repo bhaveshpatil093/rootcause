@@ -16,13 +16,13 @@ async function runIngestionJob(jobId: string, githubUrl: string, maxCommits: num
   const repoHash = crypto.createHash('md5').update(githubUrl).digest('hex');
   const reposBaseDir = join(tmpdir(), 'rootcause-repos');
   const destDir = join(reposBaseDir, repoHash);
-  
+
   try {
     updateJob(jobId, { status: 'processing', message: `Cloning repository...` });
     mkdirSync(reposBaseDir, { recursive: true });
-    
+
     // Clone with a slight buffer in depth
-    await cloneRepo(githubUrl, destDir, maxCommits + 10); 
+    await cloneRepo(githubUrl, destDir, maxCommits + 10);
 
     updateJob(jobId, { message: `Parsing git history...` });
     const logs = await getCommitLog(destDir);
@@ -75,23 +75,23 @@ async function runIngestionJob(jobId: string, githubUrl: string, maxCommits: num
 
     const datasetNames: string[] = [];
     const BATCH_SIZE = 10;
-    
+
     for (let i = 0; i < entities.length; i += BATCH_SIZE) {
       const batch = entities.slice(i, i + BATCH_SIZE);
       const datasetName = `commits-${repoHash}-${Date.now()}-batch-${i / BATCH_SIZE}`;
-      
+
       updateJob(jobId, { message: `Pushing batch ${i / BATCH_SIZE + 1} to Cognee...` });
       logger.info(`Pushing batch ${i / BATCH_SIZE + 1} (${batch.length} commits) to Cognee dataset: ${datasetName}...`);
-      
+
       await pushCommitsToCognee(batch, datasetName);
       datasetNames.push(datasetName);
-      
+
       logger.info(`Batch ${i / BATCH_SIZE + 1} pushed successfully.`);
     }
 
-    updateJob(jobId, { 
-      status: 'completed', 
-      message: 'Ingestion complete', 
+    updateJob(jobId, {
+      status: 'completed',
+      message: 'Ingestion complete',
       datasetNames,
       stats,
       error: errors.length > 0 ? errors.join('; ') : undefined
@@ -136,3 +136,6 @@ export async function POST(request: Request) {
     );
   }
 }
+
+
+export const dynamic = "force-dynamic";

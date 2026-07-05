@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import { Cognee } from '@cognee/cognee-ts';
+import { cognee } from '../../../lib/ingestion/cogneeClient';
 import { logger } from '../../../lib/ingestion/logger';
 
 export async function GET(request: Request) {
   try {
-    const cognee = new Cognee();
     
     const url = new URL(request.url);
     const query = url.searchParams.get('q') || "what functions were touched in the last week";
