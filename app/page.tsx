@@ -20,6 +20,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import RepoStructureGraph from '../components/RepoStructureGraph';
 
 type RepoMeta = {
   stars?: number;
@@ -330,10 +331,13 @@ export default function Home() {
         )}
 
         {(ingesting || activeDatasets.length > 0) && repoUrl && (
-          <RepoStats 
-            url={repoUrl} 
-            jobCommits={ingestProgress ? ingestProgress.total : processedCommits} 
-          />
+          <>
+            <RepoStats 
+              url={repoUrl} 
+              jobCommits={ingestProgress ? ingestProgress.total : processedCommits} 
+            />
+            <RepoStructureGraph url={repoUrl} />
+          </>
         )}
       </header>
 
