@@ -3,7 +3,6 @@ import { Commit } from '../../../lib/ingestion/schema';
 import { cloneRepo } from '../../../lib/ingestion/clone';
 import { getCommitLog, getCommitDiff } from '../../../lib/ingestion/parseHistory';
 import { commitToEntity } from '../../../lib/ingestion/extractEntities';
-import { pushCommitsToCognee } from '../../../lib/ingestion/remember';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { mkdirSync } from 'fs';
@@ -83,7 +82,15 @@ async function runIngestionJob(jobId: string, githubUrl: string, maxCommits: num
       updateJob(jobId, { message: `Pushing batch ${i / BATCH_SIZE + 1} to Cognee...` });
       logger.info(`Pushing batch ${i / BATCH_SIZE + 1} (${batch.length} commits) to Cognee dataset: ${datasetName}...`);
 
-      await pushCommitsToCognee(batch, datasetName);
+      const { pushCommitsToCognee } = await import(
+        "../../../lib/ingestion/remember"
+      );
+
+      await pushCommitsToCognee(
+        batch,
+        datasetName
+      );
+
       datasetNames.push(datasetName);
 
       logger.info(`Batch ${i / BATCH_SIZE + 1} pushed successfully.`);
