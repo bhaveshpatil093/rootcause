@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server';
-import { cognee } from '../../../lib/ingestion/cogneeClient';
 import { logger } from '../../../lib/ingestion/logger';
 
 export async function GET(request: Request) {
   try {
-    
+
     const url = new URL(request.url);
     const query = url.searchParams.get('q') || "what functions were touched in the last week";
-    
+
     logger.info(`[Recall Test] Querying: "${query}"`);
-    
+
+    const { cognee } = await import(
+      "../../../lib/ingestion/cogneeClient"
+    );
+
     // Attempt to recall from the memory engine
     const answer = await cognee.recall(query);
 
@@ -25,3 +28,5 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export const dynamic = "force-dynamic";
