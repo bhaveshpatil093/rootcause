@@ -19,7 +19,98 @@
  */
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+
+type RepoMeta = {
+  stars?: number;
+  forks?: number;
+  commits?: number;
+  branches?: number;
+  loading: boolean;
+};
+
+function RepoStats({ url, jobCommits }: { url: string; jobCommits?: number }) {
+  const [meta, setMeta] = useState<RepoMeta>({ loading: true });
+
+  useEffect(() => {
+    async function fetchMeta() {
+      if (!url) return;
+      const match = url.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+      if (!match) {
+        setMeta({ loading: false });
+        return;
+      }
+      
+      const [, owner, repo] = match;
+      const repoName = repo.replace('.git', '');
+
+      try {
+        const [repoRes, branchesRes] = await Promise.all([
+          fetch(`https://api.github.com/repos/${owner}/${repoName}`),
+          fetch(`https://api.github.com/repos/${owner}/${repoName}/branches?per_page=1`)
+        ]);
+
+        const repoData = repoRes.ok ? await repoRes.json() : {};
+        
+        let branches = 1;
+        if (branchesRes.ok) {
+          const link = branchesRes.headers.get('link');
+          if (link) {
+            const lastPageMatch = link.match(/page=(\d+)>; rel="last"/);
+            if (lastPageMatch) branches = parseInt(lastPageMatch[1], 10);
+          } else {
+            const data = await branchesRes.json();
+            branches = Array.isArray(data) ? data.length : 1;
+          }
+        }
+
+        setMeta({
+          stars: repoData.stargazers_count,
+          forks: repoData.forks_count,
+          branches,
+          loading: false
+        });
+      } catch (e) {
+        setMeta({ loading: false });
+      }
+    }
+    fetchMeta();
+  }, [url]);
+
+  if (meta.loading && !url) return null;
+
+  const stats = [
+    { label: 'STARS', value: meta.stars !== undefined ? meta.stars.toLocaleString() : '---' },
+    { label: 'FORKS', value: meta.forks !== undefined ? meta.forks.toLocaleString() : '---' },
+    { label: 'BRANCHES', value: meta.branches !== undefined ? meta.branches.toLocaleString() : '---' },
+    { label: 'COMMITS (GRAPH)', value: jobCommits !== undefined ? jobCommits.toLocaleString() : '---' },
+  ];
+
+  return (
+    <div className="grid grid-cols-4 gap-4 mt-6">
+      {stats.map((stat, idx) => (
+        <div 
+          key={idx}
+          className="relative overflow-hidden bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl p-5 shadow-2xl transition-all hover:bg-white/10 hover:scale-105 hover:border-white/20 duration-300 group"
+        >
+          {/* Subtle gradient glow inside the card */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[var(--amber)]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          
+          <p className="font-mono text-xs tracking-[0.2em] text-[var(--muted)] mb-2 relative z-10">
+            {stat.label}
+          </p>
+          <p className="font-mono text-2xl font-light text-[var(--text)] relative z-10">
+            {meta.loading ? (
+              <span className="inline-block w-12 h-6 bg-white/10 rounded animate-pulse" />
+            ) : (
+              stat.value
+            )}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 type Verdict = 'RESOLVED' | 'RESURFACED' | 'UNKNOWN';
 
@@ -63,6 +154,7 @@ export default function Home() {
   const [ingestStatus, setIngestStatus] = useState<string | null>(null);
   const [ingestProgress, setIngestProgress] = useState<{ progress: number; total: number; message: string } | null>(null);
   const [activeDatasets, setActiveDatasets] = useState<string[]>([]);
+  const [processedCommits, setProcessedCommits] = useState<number | undefined>(undefined);
 
   async function handleIngest(e: React.FormEvent) {
     e.preventDefault();
@@ -71,6 +163,7 @@ export default function Home() {
     setIngesting(true);
     setIngestStatus(null);
     setIngestProgress(null);
+    setProcessedCommits(undefined);
 
     try {
       const res = await fetch('/api/ingest', {
@@ -105,8 +198,10 @@ export default function Home() {
           
           if (job.stats) {
             setIngestStatus(`Case opened! ${job.stats.totalCommits} commits, ${job.stats.fixCommitsDetected} fixes, ${job.stats.functionsMapped} functions mapped.`);
+            setProcessedCommits(job.stats.totalCommits);
           } else {
             setIngestStatus(`Case opened — ${job.total} commits added to the graph.`);
+            setProcessedCommits(job.total);
           }
           
           setIngestProgress(null);
@@ -232,6 +327,13 @@ export default function Home() {
 
         {ingestStatus && !ingestProgress && (
           <p className="font-mono text-xs mt-2 text-[var(--muted)]">{ingestStatus}</p>
+        )}
+
+        {(ingesting || activeDatasets.length > 0) && repoUrl && (
+          <RepoStats 
+            url={repoUrl} 
+            jobCommits={ingestProgress ? ingestProgress.total : processedCommits} 
+          />
         )}
       </header>
 
